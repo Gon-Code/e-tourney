@@ -1,0 +1,119 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String
+  email     String   @unique
+  riotId    String?  // Ej: "Faker#KR1"
+  createdAt DateTime @default(now())
+
+  // Relación Muchos a Uno (N:1): Muchos usuarios pertenecen a un equipo
+  teamId    String?
+  team      Team?    @relation("TeamMembers", fields: [teamId], references: [id])
+
+  // Relación Uno a Uno (1:1): Un usuario puede ser capitán de un equipo
+  captainedTeam Team? @relation("TeamCaptain")
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  name      String
+  logo      String?
+  country   String?
+  createdAt DateTime @default(now())
+
+  // Capitán (1:1)
+  captainId String   @unique
+  captain   User     @relation("TeamCaptain", fields: [captainId], references: [id])
+
+  // Miembros del equipo (1:N)
+  members   User[]   @relation("TeamMembers")
+
+  // Series en las que participa el equipo
+  seriesAsT1 Series[] @relation("Team1Series")
+  seriesAsT2 Series[] @relation("Team2Series")
+  seriesWon  Series[] @relation("WinnerSeries")
+
+  // Partidas individuales en las que participa el equipo
+  matchesAsT1 Match[] @relation("Team1Matches")
+  matchesAsT2 Match[] @relation("Team2Matches")
+  matchesWon  Match[] @relation("WinnerMatches")
+}
+
+model Videogame {
+  id     String   @id @default(uuid())
+  name   String   @unique
+  series Series[]
+}
+
+enum TournamentStatus {
+  DRAFT
+  REGISTRATION
+  ACTIVE
+  COMPLETED
+}
+
+model Tournament {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  status      TournamentStatus @default(DRAFT)
+  createdAt   DateTime         @default(now())
+  
+  // Un torneo se compone de múltiples series (de cuartos, semis, final, etc.)
+  series      Series[]
+}
+
+enum SeriesFormat {
+  BO1
+  BO3
+  BO5
+}
+
+model Series {
+  id           String       @id @default(uuid())
+  format       SeriesFormat @default(BO1)
+  createdAt    DateTime     @default(now())
+
+  tournamentId String
+  tournament   Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  videogameId  String
+  videogame    Videogame    @relation(fields: [videogameId], references: [id])
+
+  team1Id      String
+  team1        Team         @relation("Team1Series", fields: [team1Id], references: [id])
+
+  team2Id      String
+  team2        Team         @relation("Team2Series", fields: [team2Id], references: [id])
+
+  winnerTeamId String?
+  winnerTeam   Team?        @relation("WinnerSeries", fields: [winnerTeamId], references: [id])
+
+  // Una Serie contiene muchas partidas individuales (ej. el BO3 puede tener 2 o 3 partidas)
+  matches      Match[]
+}
+
+model Match {
+  id           String   @id @default(uuid())
+  gameNumber   Int      // Indica si es la partida 1, 2, 3...
+  riotMatchId  String?  // ID de la API de Riot (Match-V5)
+
+  seriesId     String
+  series       Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  team1Id      String
+  team1        Team     @relation("Team1Matches", fields: [team1Id], references: [id])
+
+  team2Id      String
+  team2        Team     @relation("Team2Matches", fields: [team2Id], references: [id])
+
+  winnerTeamId String?
+  winnerTeam   Team?    @relation("WinnerMatches", fields: [winnerTeamId], references: [id])
+}
